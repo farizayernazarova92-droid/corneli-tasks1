@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ZONES, WEEK, DAYS, fmt, initials, todayName } from "@/lib/constants";
+import { ZONES, WEEK, DAYS, fmt, todayName } from "@/lib/constants";
 
 const DEFAULT_STATE = {
   staff: [
@@ -51,7 +51,7 @@ function Field({ label, gold, children }) {
 }
 
 export default function DirectorPage() {
-  const [appState, setAppStateRaw] = useState(null);
+  const [appState, setAppStateRaw] = useState(DEFAULT_STATE);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState("staff");
@@ -63,7 +63,11 @@ export default function DirectorPage() {
     fetch("/api/tasks")
       .then((r) => r.json())
       .then((data) => {
-        setAppStateRaw(data || DEFAULT_STATE);
+        if (data && data.staff) {
+          setAppStateRaw(data);
+        } else {
+          setAppStateRaw(DEFAULT_STATE);
+        }
         setLoading(false);
       })
       .catch(() => {
@@ -106,12 +110,13 @@ export default function DirectorPage() {
     );
   }
 
-  const st = appState;
+  const st = appState || DEFAULT_STATE;
+  const staffList = st.staff || [];
   const [icon, task] = WEEK[st.activeDay] || ["📋", ""];
-  const totalRevenue  = st.staff.reduce((s, p) => s + Number(p.revenue  || 0), 0);
-  const totalReceipts = st.staff.reduce((s, p) => s + Number(p.receipts || 0), 0);
-  const totalUnits    = st.staff.reduce((s, p) => s + Number(p.units    || 0), 0);
-  const totalCalls    = st.staff.reduce((s, p) => s + Number(p.calls    || 0), 0);
+  const totalRevenue  = staffList.reduce((s, p) => s + Number(p.revenue  || 0), 0);
+  const totalReceipts = staffList.reduce((s, p) => s + Number(p.receipts || 0), 0);
+  const totalUnits    = staffList.reduce((s, p) => s + Number(p.units    || 0), 0);
+  const totalCalls    = staffList.reduce((s, p) => s + Number(p.calls    || 0), 0);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   const openEdit = (p) => { setForm({ ...p }); setModal(p.id); };
@@ -120,23 +125,21 @@ export default function DirectorPage() {
   const saveModal = () => {
     const d = { ...form, revenue: Number(form.revenue)||0, receipts: Number(form.receipts)||0, units: Number(form.units)||0, calls: Number(form.calls)||0 };
     if (modal === "new") {
-      setAppState(s => ({ ...s, staff: [...s.staff, { id: Date.now(), ...d }] }));
+      setAppState(s => ({ ...s, staff: [...(s.staff||[]), { id: Date.now(), ...d }] }));
     } else {
-      setAppState(s => ({ ...s, staff: s.staff.map(p => p.id === modal ? { ...p, ...d } : p) }));
+      setAppState(s => ({ ...s, staff: (s.staff||[]).map(p => p.id === modal ? { ...p, ...d } : p) }));
     }
     setModal(null);
   };
 
   const delStaff = () => {
-    setAppState(s => ({ ...s, staff: s.staff.filter(p => p.id !== modal) }));
+    setAppState(s => ({ ...s, staff: (s.staff||[]).filter(p => p.id !== modal) }));
     setModal(null);
   };
 
   const copyLink = (id) => {
     const url = `${origin}/staff/${id}`;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(url).catch(() => {});
-    }
+    if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {});
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -165,7 +168,7 @@ export default function DirectorPage() {
             ))}
           </div>
 
-          {st.staff.map((p) => (
+          {staffList.map((p) => (
             <div key={p.id} style={S.card} onClick={() => openEdit(p)}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
@@ -194,7 +197,7 @@ export default function DirectorPage() {
           <div style={{ ...S.card, cursor: "default" }}>
             <div style={S.sectionLabel}>Общая задача для всех</div>
             <textarea
-              value={st.generalTask}
+              value={st.generalTask || ""}
               onChange={e => setAppState(s => ({ ...s, generalTask: e.target.value }))}
               placeholder="Общая задача на день..."
               style={{ ...S.input, minHeight: 52, lineHeight: 1.6 }}
@@ -212,7 +215,7 @@ export default function DirectorPage() {
           <div style={{ fontSize: 13, color: "#666", lineHeight: 1.7, marginBottom: 16 }}>
             Отправьте каждому сотруднику его личную ссылку в WhatsApp или Telegram.
           </div>
-          {st.staff.map((p) => (
+          {staffList.map((p) => (
             <div key={p.id} style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#E8E0D0", marginBottom: 5 }}>{p.name}</div>
               <div onClick={() => copyLink(p.id)} style={{ background: "#14161D", border: "1px solid #1E2130", borderRadius: 10, padding: "10px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
