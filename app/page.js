@@ -11,10 +11,8 @@ const DEFAULT_STATE = {
     { id: 4, name: "Сотрудник 4", zone: "fitting", revenue: 0, receipts: 0, units: 0, calls: 0, task: "" },
   ],
   generalTask: "",
-  activeDay: todayName(),
+  activeDay: "Понедельник",
 };
-
-// ─── helpers ────────────────────────────────────────────────────────────────
 
 const S = {
   page:        { minHeight: "100vh", background: "#0D0F14", maxWidth: 430, margin: "0 auto", position: "relative" },
@@ -52,8 +50,6 @@ function Field({ label, gold, children }) {
   );
 }
 
-// ─── Main component ──────────────────────────────────────────────────────────
-
 export default function DirectorPage() {
   const [appState, setAppStateRaw] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +59,6 @@ export default function DirectorPage() {
   const [form, setForm] = useState({});
   const [copiedId, setCopiedId] = useState(null);
 
-  // Load from Supabase on mount
   useEffect(() => {
     fetch("/api/tasks")
       .then((r) => r.json())
@@ -77,7 +72,6 @@ export default function DirectorPage() {
       });
   }, []);
 
-  // Save to Supabase
   const save = useCallback(async (newState) => {
     setSaving(true);
     try {
@@ -86,6 +80,8 @@ export default function DirectorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ state: newState }),
       });
+    } catch(e) {
+      console.error(e);
     } finally {
       setSaving(false);
     }
@@ -101,7 +97,7 @@ export default function DirectorPage() {
 
   if (loading) {
     return (
-      <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+      <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 28, marginBottom: 10 }}>⏳</div>
           <div style={{ color: "#666", fontSize: 14 }}>Загружаю данные...</div>
@@ -112,15 +108,12 @@ export default function DirectorPage() {
 
   const st = appState;
   const [icon, task] = WEEK[st.activeDay] || ["📋", ""];
-
   const totalRevenue  = st.staff.reduce((s, p) => s + Number(p.revenue  || 0), 0);
   const totalReceipts = st.staff.reduce((s, p) => s + Number(p.receipts || 0), 0);
   const totalUnits    = st.staff.reduce((s, p) => s + Number(p.units    || 0), 0);
   const totalCalls    = st.staff.reduce((s, p) => s + Number(p.calls    || 0), 0);
-
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
-  // Modal helpers
   const openEdit = (p) => { setForm({ ...p }); setModal(p.id); };
   const openAdd  = () => { setForm({ name: "", zone: "right", revenue: "", receipts: "", units: "", calls: "", task: "" }); setModal("new"); };
 
@@ -140,30 +133,29 @@ export default function DirectorPage() {
   };
 
   const copyLink = (id) => {
-    navigator.clipboard?.writeText(`${origin}/staff/${id}`).catch(() => {});
+    const url = `${origin}/staff/${id}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).catch(() => {});
+    }
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
   return (
     <div style={S.page}>
-      {/* Header */}
       <div style={S.header}>
-        <div style={S.eyebrow}>Директор · Corneli {saving && <span style={{ color: "#C8A96E55" }}>· сохраняю...</span>}</div>
+        <div style={S.eyebrow}>Директор · Corneli {saving && "· сохраняю..."}</div>
         <div style={S.h1}>{st.activeDay} · {icon} {task}</div>
       </div>
 
-      {/* Tabs */}
       <div style={S.tabBar}>
         <TabButton active={tab === "staff"}  onClick={() => setTab("staff")}>👥 Задачи</TabButton>
         <TabButton active={tab === "links"}  onClick={() => setTab("links")}>🔗 Ссылки</TabButton>
         <TabButton active={tab === "week"}   onClick={() => setTab("week")}>📅 Неделя</TabButton>
       </div>
 
-      {/* ── STAFF TAB ── */}
       {tab === "staff" && (
         <div style={{ padding: "12px 16px 0" }}>
-          {/* Summary */}
           <div style={S.summaryGrid}>
             {[["ТО итого", totalRevenue ? fmt(totalRevenue)+" ₸" : "—"], ["Чеков", totalReceipts||"—"], ["Единиц", totalUnits||"—"], ["Звонков", totalCalls||"—"]].map(([l,v]) => (
               <div key={l} style={S.sumCell}>
@@ -173,7 +165,6 @@ export default function DirectorPage() {
             ))}
           </div>
 
-          {/* Staff cards */}
           {st.staff.map((p) => (
             <div key={p.id} style={S.card} onClick={() => openEdit(p)}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -200,7 +191,6 @@ export default function DirectorPage() {
             </div>
           ))}
 
-          {/* General task */}
           <div style={{ ...S.card, cursor: "default" }}>
             <div style={S.sectionLabel}>Общая задача для всех</div>
             <textarea
@@ -217,11 +207,10 @@ export default function DirectorPage() {
         </div>
       )}
 
-      {/* ── LINKS TAB ── */}
       {tab === "links" && (
         <div style={{ padding: "14px 16px 0" }}>
           <div style={{ fontSize: 13, color: "#666", lineHeight: 1.7, marginBottom: 16 }}>
-            Отправьте каждому сотруднику его личную ссылку. Открыв на телефоне — сразу видит свои задачи.
+            Отправьте каждому сотруднику его личную ссылку в WhatsApp или Telegram.
           </div>
           {st.staff.map((p) => (
             <div key={p.id} style={{ marginBottom: 14 }}>
@@ -236,19 +225,9 @@ export default function DirectorPage() {
               </div>
             </div>
           ))}
-          <div style={{ marginTop: 8, padding: "13px 14px", background: "#14161D", borderRadius: 12, border: "1px solid #1E2130" }}>
-            <div style={{ fontSize: 11, color: "#C8A96E", fontWeight: 700, marginBottom: 8 }}>Как это работает</div>
-            <div style={{ fontSize: 13, color: "#666", lineHeight: 1.8 }}>
-              1. Ставите задачи в карточке сотрудника<br />
-              2. Копируете ссылку → отправляете в WhatsApp / Telegram<br />
-              3. Сотрудник открывает на телефоне — видит задачи<br />
-              4. Данные обновляются в реальном времени
-            </div>
-          </div>
         </div>
       )}
 
-      {/* ── WEEK TAB ── */}
       {tab === "week" && (
         <div style={{ padding: "14px 16px 0" }}>
           {DAYS.map((d) => {
@@ -273,36 +252,30 @@ export default function DirectorPage() {
         </div>
       )}
 
-      {/* ── EDIT MODAL ── */}
       {modal !== null && (
         <div style={S.modalBg} onClick={e => e.target === e.currentTarget && setModal(null)}>
           <div style={S.modal}>
             <div style={{ fontSize: 16, fontWeight: 700, color: "#F5EFE0", marginBottom: 16 }}>
               {modal === "new" ? "Новый сотрудник" : form.name}
             </div>
-
             <Field label="Имя">
               <input style={S.input} value={form.name||""} placeholder="Имя Фамилия" onChange={e => setForm(v=>({...v, name: e.target.value}))} />
             </Field>
-
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              {[["revenue","ТО план (₸)","number"],["receipts","Чеков","number"],["units","Единиц (UPT)","number"],["calls","Звонков","number"]].map(([f,l,t]) => (
+              {[["revenue","ТО план (₸)"],["receipts","Чеков"],["units","Единиц (UPT)"],["calls","Звонков"]].map(([f,l]) => (
                 <Field key={f} label={l}>
-                  <input style={S.input} type={t} value={form[f]||""} placeholder="0" onChange={e => setForm(v=>({...v,[f]:e.target.value}))} />
+                  <input style={S.input} type="number" value={form[f]||""} placeholder="0" onChange={e => setForm(v=>({...v,[f]:e.target.value}))} />
                 </Field>
               ))}
             </div>
-
             <Field label="Зона">
               <select style={{ ...S.input, appearance: "auto" }} value={form.zone||"right"} onChange={e => setForm(v=>({...v, zone: e.target.value}))}>
                 {Object.entries(ZONES).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </Field>
-
             <Field label="⭐ Задача от директора" gold>
               <textarea style={{ ...S.input, minHeight: 56, lineHeight: 1.6 }} value={form.task||""} placeholder="Персональная задача..." onChange={e => setForm(v=>({...v, task: e.target.value}))} />
             </Field>
-
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
               <button onClick={() => setModal(null)} style={{ flex: 1, padding: 10, background: "#1E2130", border: "1px solid #2A2D38", borderRadius: 8, color: "#888", fontSize: 13 }}>Отмена</button>
               {modal !== "new" && (
